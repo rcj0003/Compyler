@@ -1,0 +1,6 @@
+var stringVariable = "this is a string";
+var integerVariable = 5;
+var floatVariable = 2.2;
+
+call output "Here are the defined variables";
+call output stringVariable, floatVariable, integerVariable, "you didn't define this one";

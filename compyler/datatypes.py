@@ -12,44 +12,10 @@ class FuncParams:
         raise InterpreterException('Cannot set function parameters (read-only)')
     
     def unbox(self, scope):
-        flattened = []
-
-        for value in self.values:
-            unboxed = value.unbox(scope)
-            if type(unboxed) == list:
-                flattened.extend(unboxed)
-            else:
-                flattened.append(unboxed)
-
-        return flattened
-
-class Expression:
-    def __init__(self, lhs, rhs, operator):
-        self.lhs, self.rhs = lhs, rhs
-        self.operator = operator
-    
-    def get(self, scope):
-        return box(self.unbox(scope))
-    
-    def set(self, scope, value):
-        raise InterpreterException('Cannot set the value of an expression')
-    
-    def unbox(self, scope):
-        lhs, rhs = self.lhs.unbox(scope), self.rhs.unbox(scope)
-
-        try:
-            if self.operator == 'ADD_OP':
-                return lhs + rhs
-            elif self.operator == 'SUB_OP':
-                return lhs - rhs
-            elif self.operator == 'MULT_OP':
-                return lhs * rhs
-            elif self.operator == 'DIV_OP':
-                return lhs / rhs
-        except:
-            raise InterpreterException(f'Failed {self.operator} operation with {lhs} and {rhs}')
-        
-        raise InterpreterException(f'Unrecognized operator {self.operator}')
+        return [
+            value.unbox(scope)
+            for value in self.values
+        ]
 
 class Variable:
     def __init__(self, name):

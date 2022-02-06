@@ -19,6 +19,7 @@ class ParseTree:
         self.temp_children = []
         
     def add_children(self, *children):
+        #print(*children)
         self.temp_children.extend(children)
 
     def clean(self):
@@ -46,9 +47,9 @@ class ParseTree:
             ]
         }
     
-    def save(self, file_name):
+    def save(self, file_name, indent=None):
         with open(file_name, 'w') as file:
-            json.dump(self.as_json(), file)
+            json.dump(self.as_json(), file, indent=indent)
 
 class Token:
     def __init__(self, name, value):
@@ -92,18 +93,25 @@ class FirstGroupTokenizer(BaseTokenizer):
         raise TokenizeException('Failed to tokenize')
 
 class GroupTokenizer:
-    def __init__(self, name, *tokenizers):
+    def __init__(self, name, *tokenizers, keep_flat=False):
         self.name = name
         self.tokenizers = tokenizers
+        self.keep_flat = keep_flat
     
     def __str__(self):
         return f'{self.name} ({", ".join(str(tokenizer) for tokenizer in self.tokenizers)})'
     
     def tokenize(self, tree, reader, lookup):
-        new_tree = ParseTree(name=self.name)
+        child_tree = ParseTree(name=self.name)
+
         for tokenizer in self.tokenizers:
-            tokenizer.tokenize(new_tree, reader, lookup)
-        tree.add_children(new_tree)
+            tokenizer.tokenize(child_tree, reader, lookup)
+        
+        if self.keep_flat:
+            child_tree.clean()
+            tree.add_children(*child_tree.children)
+        else:
+            tree.add_children(child_tree)
 
 class LookupTokenizer:
     def __init__(self, lookup_name):
@@ -158,19 +166,19 @@ class TokenizerBuilder:
         self.state.append(LookupTokenizer(lookup_name))
         return self
     
-    def group(self, name):
-        self.state = [GroupTokenizer(name, *self.state)]
+    def group(self, name, keep_flat=False):
+        self.state = [GroupTokenizer(name, *self.state, keep_flat=keep_flat)]
         return self
     
-    def next(self, first_group=False):
-        self.schema_builder.rule(self.build(first_group))
+    def next(self, first_group=False, keep_flat=False):
+        self.schema_builder.rule(self.build(first_group, keep_flat))
         return self.schema_builder
     
-    def build(self, first_group=False):
+    def build(self, first_group=False, keep_flat=False):
         if first_group:
             return FirstGroupTokenizer(self.name, *self.state)
         else:
-            return GroupTokenizer(self.name, *self.state)
+            return GroupTokenizer(self.name, *self.state, keep_flat=keep_flat)
 
 class TokenizerSchemaBuilder:
     def __init__(self):
@@ -201,7 +209,7 @@ class TokenizerSchema:
     
     def load(self, file_name, debug=False):
         with open(file_name, 'r') as file:
-            return self.parse(file.read())
+            return self.parse(file.read(), debug)
     
     def parse(self, string, debug=False):
         reader = StringReader(string, exceptions=[TokenizeException])

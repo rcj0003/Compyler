@@ -1,8 +1,40 @@
 from . import datatypes
 import re
+from .exceptions import InterpreterException
 
 
 STRING_VALUE = re.compile('"(.*)"')
+
+# === [ Calculations ] === #
+class Expression:
+    def __init__(self, lhs, rhs):
+        self.lhs, self.rhs = lhs, rhs
+    
+    def get(self, scope):
+        return datatypes.box(self.unbox(scope))
+    
+    def set(self, scope, value):
+        raise InterpreterException('Cannot set the value of an expression')
+
+class Addition(Expression):
+    def unbox(self, scope):
+        lhs, rhs = self.lhs.unbox(scope), self.rhs.unbox(scope)
+        return lhs + rhs
+
+class Subtraction(Expression):
+    def unbox(self, scope):
+        lhs, rhs = self.lhs.unbox(scope), self.rhs.unbox(scope)
+        return lhs - rhs
+
+class Multiplication(Expression):
+    def unbox(self, scope):
+        lhs, rhs = self.lhs.unbox(scope), self.rhs.unbox(scope)
+        return lhs * rhs
+
+class Division(Expression):
+    def unbox(self, scope):
+        lhs, rhs = self.lhs.unbox(scope), self.rhs.unbox(scope)
+        return lhs / rhs
 
 # === [ Instructions ] === #
 class Assign:
@@ -32,13 +64,38 @@ def assign(child, translator):
 def var_name(child, translator):
     return translator.translate(child.children[0])[0]
 
-def keyword(child, translator):
-    return datatypes.Variable(child.value)
+class KeywordTranslator:
+    def __init__(self):
+        self._cache = {}
+    
+    def __call__(self, child, translator):
+        return self._cache.setdefault(child.value, datatypes.Variable(child.value))
 
 def expression(child, translator):
     lhs = translator.translate(child.children[0])[0]
     rhs = translator.translate(child.children[2])[0]
-    return datatypes.Expression(lhs, rhs, child.children[1].name)
+    operator = child.children[1].name
+
+    operation = None
+
+    try:
+        if operator == 'ADD_OP':
+            operation = Addition(lhs, rhs)
+        elif operator == 'SUB_OP':
+            operation = Subtraction(lhs, rhs)
+        elif operator == 'MULT_OP':
+            operation = Multiplication(lhs, rhs)
+        elif operator == 'DIV_OP':
+            operation = Division(lhs, rhs)
+    except:
+        raise InterpreterException(f'Failed {operator} operation with {lhs} and {rhs}')
+    
+    if not operation:
+        raise InterpreterException(f'Unrecognized operator {operator}')
+
+    if lhs is datatypes.Literal and rhs is datatypes.Literal:
+        return operation.get(None)
+    return operation
 
 def string_literal(child, translator):
     return datatypes.String(STRING_VALUE.match(child.value).group(1))
@@ -54,11 +111,8 @@ def function_params(child, translator):
 
 def function_call(child, translator):
     name = child.children[0].value
-    if len(child.children) > 1:
-        params = translator.translate(child.children[1])[0]
-    else:
-        params = datatypes.FuncParams([])
-    return FunctionCall(name, params)
+    params = translator.translate(*child.children[1:])
+    return FunctionCall(name, datatypes.FuncParams(params))
 
 def body(child, translator):
     return translator.translate(*child.children)
@@ -66,7 +120,7 @@ def body(child, translator):
 TRANSLATORS = {
     'STRICT_ASSIGN': strict_assign,
     'ASSIGN': assign,
-    'KEY_WORD': keyword,
+    'KEY_WORD': KeywordTranslator(),
     'EXPRESSION': expression,
     'STR_LITERAL': string_literal,
     'FLOAT_LITERAL': float_literal,

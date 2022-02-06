@@ -7,14 +7,14 @@ schema = TokenizerSchemaBuilder()\
             TokenizerBuilder('BODY')
                 .lookup_rule('INSTRUCTION')
                 .lookup_rule('BODY')
-                .build()
+                .build(keep_flat=True)
         )\
         .rule(
             TokenizerBuilder('BODY')
                 .lookup_rule('INSTRUCTION')
                 .regex_rule(';')
                 .lookup_rule('BODY')
-                .build()
+                .build(keep_flat=True)
         )\
         .lookup_rule('INSTRUCTION')\
         .next(first_group=True)\
@@ -26,7 +26,7 @@ schema = TokenizerSchemaBuilder()\
     .complex_rule('STRICT_ASSIGN')\
         .regex_rule('VAR\\s+', flags=[re.IGNORECASE])\
         .lookup_rule('ASSIGN')\
-        .next()\
+        .next(keep_flat=True)\
     .complex_rule('ASSIGN')\
         .lookup_rule('VAR_NAME')\
         .regex_rule('=')\
@@ -47,7 +47,7 @@ schema = TokenizerSchemaBuilder()\
                 .lookup_rule('EXPRESSION')\
                 .regex_rule('\\,')\
                 .lookup_rule('FUNC_PARAMS')\
-                .build()\
+                .build(keep_flat=True)\
         )\
         .lookup_rule('EXPRESSION')\
         .next(first_group=True)\

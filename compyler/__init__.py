@@ -3,7 +3,6 @@ from .parsing import schema
 from .exceptions import InterpreterException
 from ._internal.translation import InterpretedTranslationLayer
 from ._translation import TRANSLATORS
-from .builtins import BUILT_INS
 
 
 def parse(script):
@@ -65,6 +64,9 @@ class Scope:
         self.functions[name] = instruction
     
     def get_function(self, function_name):
+        builtin = self.environment.get_builtin(function_name)
+        if builtin:
+            return builtin
         if self.parent:
             return self.functions.get(function_name, self.parent.get_function(function_name))
         function = self.functions.get(function_name)
@@ -92,22 +94,41 @@ class Scope:
     
     def clone(self):
         return Scope(self.environment, self.data, self.labels, self.functions, parent=self.parent)
+    
+    def clear(self):
+        self.data.clear()
+        self.functions.clear()
+        self.labels.clear()
 
 TRANSLATION_LAYER = InterpretedTranslationLayer(TRANSLATORS)
 
 class Interpreter:
-    def __init__(self, strict_mode=False):
-        self.scope = Scope(self, functions=BUILT_INS)
+    def __init__(self, builtins={}, strict_mode=False):
+        self._builtins = builtins
+        self.scope = Scope(self)
         self.strict_mode = strict_mode
+        self._cached = []
+    
+    def get_builtin(self, name):
+        return self._builtins.get(name)
+    
+    def cache(self, tree):
+        self._cached = TRANSLATION_LAYER.translate(*tree.children)
+        return self._cached
+    
+    def run_cached(self):
+        self.scope.clear()
+        for instruction in self._cached:
+            instruction(self.scope)
+        return self.scope
     
     def load(self, script):
         return self.run(parse(script))
     
     def run(self, tree):
         instructions = TRANSLATION_LAYER.translate(*tree.children)
-        scope = self.scope.clone()
 
+        self.scope.clear()
         for instruction in instructions:
-            instruction(scope)
-
-        return scope
+            instruction(self.scope)
+        return self.scope

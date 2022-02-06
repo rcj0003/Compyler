@@ -1,61 +1,54 @@
 import re
+import json
 
-from compyler.utils import StringReader, multi_flag
+from .utils import StringReader, multi_flag
 
 
 class TokenizeException(Exception):
     pass
 
 class ParseTree:
-    def __init__(self, tokens=None, children=None, name='root'):
+    def __init__(self, children=None, name='root'):
         self.name = name
-        if tokens is None:
-            self.tokens = []
-        else:
-            self.tokens = tokens
-        
+
         if children is None:
             self.children = []
         else:
             self.children = children
         
-        self.temp_tokens = []
         self.temp_children = []
         
     def add_children(self, *children):
         self.temp_children.extend(children)
-    
-    def add_tokens(self, *tokens):
-        self.temp_tokens.extend(tokens)
 
     def clean(self):
-        self.tokens.extend(self.temp_tokens)
         self.children.extend(self.temp_children)
-        self.temp_tokens.clear()
         self.temp_children.clear()
         for child in self.children:
             child.clean()
     
     def revert(self):
-        self.temp_tokens.clear()
         self.temp_children.clear()
         for child in self.children:
             child.revert()
-    
+
+    def __repr__(self):
+        return json.dumps(self.as_json(), indent=4)
+
+    def __str__(self):
+        return json.dumps(self.as_json(), indent=4)
+
     def as_json(self):
         return {
             'name': self.name,
-            'tokens': [
-                {
-                    'name': token.name,
-                    'value': token.value
-                }
-                for token in self.tokens
-            ],
             'children': [
                 child.as_json() for child in self.children
             ]
         }
+    
+    def save(self, file_name):
+        with open(file_name, 'w') as file:
+            json.dump(self.as_json(), file)
 
 class Token:
     def __init__(self, name, value):
@@ -64,6 +57,18 @@ class Token:
     
     def __repr__(self):
         return f'{self.name} "{self.value}"'
+    
+    def clean(self):
+        pass
+    
+    def revert(self):
+        pass
+
+    def as_json(self):
+        return {
+            'name': self.name,
+            'value': self.value
+        }
 
 class BaseTokenizer:
     name = 'BASE'
@@ -131,7 +136,7 @@ class RegexTokenizer:
         match = reader.match(self.regex)
         if match:
             if not self.discard:
-                tree.add_tokens(Token(self.name, match.group(0)))
+                tree.add_children(Token(self.name, match.group(0)))
             return
         raise TokenizeException(f'{self.name} {self._raw} {reader.remaining()}')
 
@@ -194,20 +199,35 @@ class TokenizerSchema:
         self._production_lookup = {tokenizer.name: tokenizer for tokenizer in tokenizers}
         self._productions = tokenizers
     
-    def parse(self, string):
+    def load(self, file_name, debug=False):
+        with open(file_name, 'r') as file:
+            return self.parse(file.read())
+    
+    def parse(self, string, debug=False):
         reader = StringReader(string, exceptions=[TokenizeException])
         tree = ParseTree()
         looped = False
 
         while reader.has_next():
             if looped:
-                raise TokenizeException(f'Failed to tokenize starting at offset {reader.offset} ({reader.remaining()[:16]}...)')
+                if debug:
+                    print(tree.as_json())
+                raise TokenizeException(self._format_failed(reader))
             for production in self._productions:
                 with reader.context() as temp_reader:
                     production.tokenize(tree, temp_reader, self._production_lookup)
+                    if debug:
+                        print('Success', production.name)
                     tree.clean()
                     continue
+                if debug:
+                    print('Fail', production.name)
                 tree.revert()
             looped = True
         
         return tree
+    
+    @staticmethod
+    def _format_failed(reader):
+        line, line_no, offset = reader.get_line()
+        return f'Failed to tokenize at line {line_no} (likely syntax error):\n{line}\n{"".join(([" "] * (offset)) + ["^"])}'

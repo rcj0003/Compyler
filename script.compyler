@@ -1,6 +1,7 @@
-var stringVariable = "this is a string";
-var integerVariable = 5;
-var floatVariable = 2.2;
+VAR someNumber = 123
+VAR someString = "[String: \\"String\\" STRING]"
+VAR someFloat = 55.2
 
-call output "Here are the defined variables";
-call output stringVariable, floatVariable, integerVariable, "you didn't define this one";
+someNumber = ((someNumber + 5 - 66) * 10 / 3) * 3
+
+PRINT "Here is the value of" + " the above defined variables:", someNumber, someString, someFloat

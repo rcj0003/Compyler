@@ -113,3 +113,178 @@ The above is certainly an eyesore, but it roughly approximates BNF.
 It parses the script you give it out into recursive trees, each with the production name and child elements. These elements will either be a token with a name and string value, or another tree.
 
 After writing productions and successfully parsing out your script, you need to tell Compyler how to translate it into runnable code. A "translation layer" needs to be made, which will parse out tokens and children parse trees into something runnable. The translation layer can compile or interpret to anything with enough knowhow. I choose to map out parse tree data into Python function calls and to box the interpreted data.
+
+## Parsing
+```
+VAR someNumber = 123
+VAR someString = "[String: \\"String\\" STRING]"
+VAR someFloat = 55.2
+
+someNumber = ((someNumber + 5 - 66) * 10 / 3) * 3
+
+PRINT "Here is the value of" + " the above defined variables:", someNumber, someString, someFloat
+```
+
+With the default tokenizer schema, the above script will parse out like so:
+```json
+{
+    "name": "root",
+    "children": [
+        {
+            "name": "ASSIGN",
+            "children": [
+                {
+                    "name": "KEY_WORD",
+                    "value": "someNumber"
+                },
+                {
+                    "name": "INT_LITERAL",
+                    "value": "123"
+                }
+            ]
+        },
+        {
+            "name": "ASSIGN",
+            "children": [
+                {
+                    "name": "KEY_WORD",
+                    "value": "someString"
+                },
+                {
+                    "name": "STR_LITERAL",
+                    "value": "\"[String: \\\\\"String\\\\\" STRING]\""
+                }
+            ]
+        },
+        {
+            "name": "ASSIGN",
+            "children": [
+                {
+                    "name": "KEY_WORD",
+                    "value": "someFloat"
+                },
+                {
+                    "name": "FLOAT_LITERAL",
+                    "value": "55.2"
+                }
+            ]
+        },
+        {
+            "name": "ASSIGN",
+            "children": [
+                {
+                    "name": "KEY_WORD",
+                    "value": "someNumber"
+                },
+                {
+                    "name": "EXPRESSION",
+                    "children": [
+                        {
+                            "name": "EXPRESSION",
+                            "children": [
+                                {
+                                    "name": "EXPRESSION",
+                                    "children": [
+                                        {
+                                            "name": "KEY_WORD",
+                                            "value": "someNumber"
+                                        },
+                                        {
+                                            "name": "ADD_OP",
+                                            "value": "+"
+                                        },
+                                        {
+                                            "name": "EXPRESSION",
+                                            "children": [
+                                                {
+                                                    "name": "INT_LITERAL",
+                                                    "value": "5"
+                                                },
+                                                {
+                                                    "name": "SUB_OP",
+                                                    "value": "-"
+                                                },
+                                                {
+                                                    "name": "INT_LITERAL",
+                                                    "value": "66"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "MULT_OP",
+                                    "value": "*"
+                                },
+                                {
+                                    "name": "EXPRESSION",
+                                    "children": [
+                                        {
+                                            "name": "INT_LITERAL",
+                                            "value": "10"
+                                        },
+                                        {
+                                            "name": "DIV_OP",
+                                            "value": "/"
+                                        },
+                                        {
+                                            "name": "INT_LITERAL",
+                                            "value": "3"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "MULT_OP",
+                            "value": "*"
+                        },
+                        {
+                            "name": "INT_LITERAL",
+                            "value": "3"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "FUNC_CALL",
+            "children": [
+                {
+                    "name": "KEY_WORD",
+                    "value": "PRINT"
+                },
+                {
+                    "name": "EXPRESSION",
+                    "children": [
+                        {
+                            "name": "STR_LITERAL",
+                            "value": "\"Here is the value of\""
+                        },
+                        {
+                            "name": "ADD_OP",
+                            "value": "+"
+                        },
+                        {
+                            "name": "STR_LITERAL",
+                            "value": "\" the above defined variables:\""
+                        }
+                    ]
+                },
+                {
+                    "name": "KEY_WORD",
+                    "value": "someNumber"
+                },
+                {
+                    "name": "KEY_WORD",
+                    "value": "someString"
+                },
+                {
+                    "name": "KEY_WORD",
+                    "value": "someFloat"
+                }
+            ]
+        }
+    ]
+}
+```

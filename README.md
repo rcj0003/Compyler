@@ -2,10 +2,10 @@
 General purpose compiler/interpreter for Python
 
 ## Disclaimers
-I know nothing about compilers or interpreters (except for basic knowledge of Backus-Naur Form). I bashed my head against my keyboard for a couple of hours and this was born.
+I know nothing about compilers or interpreters (except for basic knowledge of Backus-Naur Form).
 
 ## Does it work?
-Yes, but I'm not sure how well. The test "schema" seems to run fast. There is likely some unnecessary nesting, so I'm not sure how large programs would be handled.
+Yes. although I'm not sure what happens with particularly complex "tokenizer schemas", and if enough recursion will cause problems.
 
 ## How does it work?
 With lots of recursion... It basically brute forces the script you the `TokenizerSchema`, and if it can't fit at least part of one of the "rules"/productions (more like pseudo-productions), then it'll start over from the last place it was able to parse. It won't go back further than that; if it can't continue to tokenize, it'll throw a `TokenizeException`, basically a syntax or compiler error.
@@ -107,75 +107,9 @@ schema = TokenizerSchemaBuilder()\
     .build()
 ```
 
-I won't really begin to explain the syntax above, but BODY, INSTRUCTION, FUNCTION, and ASSIGNMENT roughly translate to these BNF productions:
-```
-<BODY> ::= <INSTRUCTION>; <BODY> |
-     <INSTRUCTION>;
-<INSTRUCTION> ::= <ASSIGNMENT> | <
-     <FUNCTION>
-<FUNCTION> ::= CALL <KEYWORD> <ARRAY> |
-     CALL <KEYWORD>
-<ASSIGNMENT> ::= VAR <KEYWORD> = <EXPRESSION>
-```
 
-It parses the script you give it out into recursive trees, each with the production name, the subtokens associated with it, and its child trees.
+The above is certainly an eyesore, but it roughly approximates BNF.
 
-Then, a "translation layer" needs to be made, which will parse out the root tree into "instructions", a list of functions to call. After writing productions and successfully parsing out your script, you need to tell Compyler how to translate it into runnable code.
-```python
-from compyler import InterpretedEnvironment
-from compyler.translation import InterpretedTranslationLayer
+It parses the script you give it out into recursive trees, each with the production name and child elements. These elements will either be a token with a name and string value, or another tree.
 
-
-class SetEnvironmentValue:
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
-
-    def __call__(self, environment):
-        environment.set_data(self.name, self.value)
-
-class AssignmentTranslator:
-    tree_name = 'ASSIGNMENT'
-
-    def translate(self, tree, translation_layer):
-        keyword = tree.tokens[0].value
-        value = None
-
-        if len(tree.tokens) > 1:
-            value = translation_layer.translate_token(tree.tokens[1])
-        else:
-            value = translation_layer.translate(tree.children)
-        
-        return SetEnvironmentValue(keyword, value)
-
-class Literal:
-    def __init__(self, value):
-        self.value = value
-
-    def get_value(self, environment):
-        return self.value
-
-    def set_value(self, environment, value):
-        raise Exception('Cannot set the value of an expression')
-
-class DecimalTranslator:
-    token_name = 'DECIMAL_LITERAL'
-
-    def translate(self, token):
-        return Literal(float(token.value))
-
-script = 'var test = 5.0;'
-interpreted_builtins = {}
-translation_layer = InterpretedTranslationLayer(tree_translators=[AssignmentTranslator()], token_translators=[DecimalTranslator()])
-env = InterpretedEnvironment(translation_layer, interpreted_builtins)
-tree = schema.parse(script)
-env.compile(tree)
-env.run()
-# Outputs:
-#
-# === [Environment Variables] ===
-# test = 5.0
-# ===
-#
-env.print_data()
-```
+After writing productions and successfully parsing out your script, you need to tell Compyler how to translate it into runnable code. A "translation layer" needs to be made, which will parse out tokens and children parse trees into something runnable. The translation layer can compile or interpret to anything with enough knowhow. I choose to map out parse tree data into Python function calls and to box the interpreted data.
